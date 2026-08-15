@@ -1,0 +1,13 @@
+{
+  "id": "1",
+  "name": "Flavia Yemek Masası",
+  "category": "Yemek Odası",
+  "subcategory": "Yemek Masası",
+  "material": ["MDF"],
+  "color": ["Bej"],
+  "measurements": "180 x 90 x 75 cm",
+  "url": "https://tabrano.com/flavia-yemek-masasi",
+  "images": [
+    "https://static.ticimax.cloud/cdn-cgi/image/width=725,quality=85,format=webp/75297/uploads/urunresimleri/buyuk/flavia-yemek-masasi-0-86ed.png"
+  ]
+}
