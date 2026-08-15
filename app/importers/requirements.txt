@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+openai
+psycopg2-binary
+Pillow
+rembg[cpu]
+google-genai
+PyJWT
+zeep
+requests
+beautifulsoup4
+lxml
+python-multipart
