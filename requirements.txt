@@ -2,7 +2,7 @@ fastapi
 uvicorn[standard]
 python-dotenv
 openai
-psycopg2-binary
+psycopg[binary]
 Pillow
 rembg[cpu]
 google-genai
