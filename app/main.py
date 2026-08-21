@@ -33,7 +33,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://tabrano-ui.vercel.app",
+        "https://tabrano.com",
+        "https://www.tabrano.com",
+    ],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
