@@ -1,0 +1,465 @@
+<!--
+  Tabrano - "Arkadaşlarına Sor" özelliği
+  Ticimax admin panelindeki "Özel Kod Alanı" (site geneli JS/CSS enjeksiyon) içine
+  bu dosyanın TAMAMINI olduğu gibi yapıştırın. Sayfa tipini kendi tespit eder,
+  ürün detay sayfası dışında hiçbir şey yapmaz; mevcut hiçbir class/id'ye dokunmaz.
+
+  Backend: https://tabrano-ai-production.up.railway.app  (tabrano-ai / FastAPI)
+  Gerekli endpoint'ler: POST /vote/create, POST /vote, GET /vote/{vote_id}, GET /products/search
+-->
+<style>
+.tbrn-ask-card{margin-top:14px;padding:16px 18px;border:1px solid #e7e1d6;border-radius:14px;background:linear-gradient(135deg,#faf7f0,#f3efe4);font-family:inherit}
+.tbrn-ask-card__title{margin:0 0 4px;font-size:15px;font-weight:700;color:#2c2a24}
+.tbrn-ask-card__desc{margin:0 0 12px;font-size:13px;line-height:1.4;color:#6b6558}
+.tbrn-ask-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;box-sizing:border-box;border:none;border-radius:10px;padding:11px 16px;font-size:14px;font-weight:600;cursor:pointer;background:#2c2a24;color:#fff;transition:opacity .15s}
+.tbrn-ask-btn:hover{opacity:.88}
+.tbrn-ask-btn:disabled{opacity:.5;cursor:not-allowed}
+.tbrn-ask-btn--ghost{background:#fff;color:#2c2a24;border:1px solid #d8d2c4}
+.tbrn-ask-btn--wa{background:#25D366}
+
+.tbrn-overlay{position:fixed;inset:0;background:rgba(20,18,14,.55);z-index:999999;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px)}
+@media(min-width:640px){.tbrn-overlay{align-items:center}}
+.tbrn-modal{width:100%;max-width:480px;max-height:92vh;overflow-y:auto;background:#fff;border-radius:20px 20px 0 0;padding:22px 20px 26px;box-sizing:border-box;font-family:inherit;box-shadow:0 -8px 40px rgba(0,0,0,.2)}
+@media(min-width:640px){.tbrn-modal{border-radius:20px;margin:20px}}
+.tbrn-modal__head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.tbrn-modal__title{margin:0;font-size:17px;font-weight:700;color:#2c2a24}
+.tbrn-modal__close{border:none;background:#f2efe8;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer;color:#6b6558;line-height:1}
+
+.tbrn-vs-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.tbrn-vs-card{border:1px solid #e7e1d6;border-radius:14px;padding:10px;text-align:center;position:relative}
+.tbrn-vs-card img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px;background:#f3efe4}
+.tbrn-vs-card__name{font-size:12.5px;font-weight:600;color:#2c2a24;margin:8px 0 2px;min-height:32px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tbrn-vs-card__price{font-size:13px;font-weight:700;color:#2c2a24}
+.tbrn-vs-label{position:absolute;top:6px;left:6px;background:#2c2a24;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px}
+.tbrn-vs-vs{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#a39c8a;margin:2px 0}
+
+.tbrn-search-wrap{position:relative;margin-bottom:6px}
+.tbrn-search-input{width:100%;box-sizing:border-box;padding:11px 14px;border:1px solid #d8d2c4;border-radius:10px;font-size:14px;outline:none}
+.tbrn-search-input:focus{border-color:#2c2a24}
+.tbrn-search-results{margin-top:6px;max-height:220px;overflow-y:auto;border:1px solid #eee6d8;border-radius:10px;display:none}
+.tbrn-search-results.is-open{display:block}
+.tbrn-search-item{display:flex;align-items:center;gap:10px;padding:8px 10px;cursor:pointer;border-bottom:1px solid #f2efe8}
+.tbrn-search-item:last-child{border-bottom:none}
+.tbrn-search-item:hover{background:#faf7f0}
+.tbrn-search-item img{width:36px;height:36px;object-fit:cover;border-radius:6px;background:#f3efe4;flex:none}
+.tbrn-search-item__name{font-size:12.5px;color:#2c2a24;line-height:1.3}
+.tbrn-search-item__price{font-size:11.5px;color:#8a8373}
+.tbrn-search-empty{padding:10px;font-size:12.5px;color:#8a8373;text-align:center}
+
+.tbrn-share-box{text-align:center;padding:6px 0 2px}
+.tbrn-share-box__title{font-size:16px;font-weight:700;color:#2c2a24;margin:6px 0 4px}
+.tbrn-share-box__desc{font-size:13px;color:#6b6558;margin:0 0 18px}
+.tbrn-share-actions{display:flex;flex-direction:column;gap:10px}
+
+.tbrn-results{text-align:center}
+.tbrn-results__you{font-size:13px;color:#6b6558;margin:2px 0 14px}
+.tbrn-bar{height:10px;border-radius:6px;background:#f2efe8;overflow:hidden;display:flex;margin:6px 0 2px}
+.tbrn-bar__a{background:#2c2a24;height:100%}
+.tbrn-bar__b{background:#d8d2c4;height:100%}
+.tbrn-results__count{font-size:12px;color:#8a8373;margin-top:10px}
+.tbrn-vote-btn{margin-top:8px;width:100%}
+
+.tbrn-spinner{width:22px;height:22px;border:3px solid #eee6d8;border-top-color:#2c2a24;border-radius:50%;animation:tbrn-spin .7s linear infinite;margin:20px auto}
+@keyframes tbrn-spin{to{transform:rotate(360deg)}}
+.tbrn-error{font-size:13px;color:#b3413a;text-align:center;padding:10px 0}
+</style>
+
+<script>
+(function () {
+  "use strict";
+
+  var TBRN_API = "https://tabrano-ai-production.up.railway.app";
+  var VOTE_PARAM = "oy";
+  var UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+  function escapeHtml(str) {
+    return String(str == null ? "" : str).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function formatTL(n) {
+    if (n == null || isNaN(n)) return "";
+    try {
+      return Number(n).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " TL";
+    } catch (e) {
+      return n + " TL";
+    }
+  }
+
+  function getVoterToken() {
+    try {
+      var t = localStorage.getItem("tbrn_voter_token");
+      if (!t) {
+        t = (crypto && crypto.randomUUID) ? crypto.randomUUID() : "tbrn-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+        localStorage.setItem("tbrn_voter_token", t);
+      }
+      return t;
+    } catch (e) {
+      return "tbrn-session-" + Date.now();
+    }
+  }
+
+  function api(path, options) {
+    return fetch(TBRN_API + path, options).then(function (res) {
+      if (!res.ok) {
+        return res.json().catch(function () { return {}; }).then(function (body) {
+          throw new Error(body.detail || "İstek başarısız oldu.");
+        });
+      }
+      return res.json();
+    });
+  }
+
+  function slugFromUrl(url) {
+    try {
+      return new URL(url, location.origin).pathname.replace(/^\/+|\/+$/g, "").toLowerCase();
+    } catch (e) {
+      return String(url || "").replace(/^https?:\/\/[^/]+\/?/, "").replace(/\/+$/, "").toLowerCase();
+    }
+  }
+
+  function debounce(fn, ms) {
+    var t;
+    return function () {
+      var args = arguments, ctx = this;
+      clearTimeout(t);
+      t = setTimeout(function () { fn.apply(ctx, args); }, ms);
+    };
+  }
+
+  function closeOverlay(overlay) {
+    if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    document.body.style.overflow = "";
+  }
+
+  function openOverlay(innerHtml) {
+    var overlay = document.createElement("div");
+    overlay.className = "tbrn-overlay";
+    overlay.innerHTML = '<div class="tbrn-modal">' + innerHtml + "</div>";
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay) closeOverlay(overlay);
+    });
+    document.body.appendChild(overlay);
+    document.body.style.overflow = "hidden";
+    return overlay;
+  }
+
+  function productCardHtml(label, product) {
+    if (!product) {
+      return '<div class="tbrn-vs-card"><div class="tbrn-vs-label">' + label + '</div><div class="tbrn-search-empty">Ürün bulunamadı</div></div>';
+    }
+    return (
+      '<div class="tbrn-vs-card">' +
+        '<div class="tbrn-vs-label">' + label + '</div>' +
+        '<img src="' + escapeHtml(product.image || "") + '" alt="" loading="lazy">' +
+        '<div class="tbrn-vs-card__name">' + escapeHtml(product.name) + "</div>" +
+        '<div class="tbrn-vs-card__price">' + (product.price != null ? formatTL(product.price) : "") + "</div>" +
+      "</div>"
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // 1) ÜRÜN DETAY SAYFASI: "Arkadaşlarına Sor" kartı + oluşturma modalı
+  // ---------------------------------------------------------------------
+
+  function initAskFriendsCard() {
+    var model = window.productDetailModel;
+    if (!model || !model.productId) return;
+
+    var anchor = document.querySelector(".MiddleList");
+    if (!anchor || !anchor.parentNode) return;
+
+    if (document.querySelector(".tbrn-ask-card")) return;
+
+    var cardHtml =
+      '<div class="tbrn-ask-card">' +
+        '<p class="tbrn-ask-card__title">Karar veremiyor musun?<br>Arkadaşlarına sor.</p>' +
+        '<p class="tbrn-ask-card__desc">Bu ürünü başka bir seçenekle karşılaştır, arkadaşlarının fikrini al.</p>' +
+        '<button type="button" class="tbrn-ask-btn" id="tbrnAskBtn">👥 Arkadaşlarıma Sor</button>' +
+      "</div>";
+
+    anchor.insertAdjacentHTML("afterend", cardHtml);
+
+    var btn = document.getElementById("tbrnAskBtn");
+    if (btn) {
+      btn.addEventListener("click", function () {
+        openCreateModal(model);
+      });
+    }
+  }
+
+  function currentProductA(model) {
+    var p = model.product || {};
+    return {
+      // Ticimax'ın productId/urunKartiId'si tabrano-ai'daki product_card_id ile
+      // eşleşmiyor (ayrı bir sıra numarası), bu yüzden eşleştirme URL slug'ı
+      // üzerinden yapılıyor.
+      id: slugFromUrl(location.href),
+      name: model.productName || "",
+      price: model.productPriceKDVIncluded != null ? model.productPriceKDVIncluded : null,
+      image: p.spotResimBuyukYolu || p.spotResimYolu || "",
+    };
+  }
+
+  function openCreateModal(model) {
+    var productA = currentProductA(model);
+    var selectedB = null;
+
+    var overlay = openOverlay(
+      '<div class="tbrn-modal__head">' +
+        '<h3 class="tbrn-modal__title">Hangisini seçerdin?</h3>' +
+        '<button type="button" class="tbrn-modal__close" id="tbrnClose">✕</button>' +
+      "</div>" +
+      '<div class="tbrn-vs-row" id="tbrnVsRow">' +
+        productCardHtml("A", productA) +
+        '<div class="tbrn-vs-card" id="tbrnBSlot">' +
+          '<div class="tbrn-vs-label">B</div>' +
+          '<div class="tbrn-search-empty">Bir ürün seç</div>' +
+        "</div>" +
+      "</div>" +
+      '<div class="tbrn-search-wrap">' +
+        '<input type="text" class="tbrn-search-input" id="tbrnSearchInput" placeholder="B ürünü ara (ör. sehpa, koltuk...)" autocomplete="off">' +
+        '<div class="tbrn-search-results" id="tbrnSearchResults"></div>' +
+      "</div>" +
+      '<button type="button" class="tbrn-ask-btn" id="tbrnCreateBtn" disabled>Oylama Linkini Oluştur</button>' +
+      '<div id="tbrnCreateMsg"></div>'
+    );
+
+    document.getElementById("tbrnClose").addEventListener("click", function () {
+      closeOverlay(overlay);
+    });
+
+    var input = document.getElementById("tbrnSearchInput");
+    var results = document.getElementById("tbrnSearchResults");
+    var createBtn = document.getElementById("tbrnCreateBtn");
+
+    var runSearch = debounce(function (q) {
+      if (q.length < 2) {
+        results.classList.remove("is-open");
+        results.innerHTML = "";
+        return;
+      }
+      api("/products/search?q=" + encodeURIComponent(q))
+        .then(function (list) {
+          list = (list || []).filter(function (p) { return slugFromUrl(p.url) !== productA.id; });
+          if (!list.length) {
+            results.innerHTML = '<div class="tbrn-search-empty">Sonuç bulunamadı</div>';
+          } else {
+            results.innerHTML = list.map(function (p) {
+              return (
+                '<div class="tbrn-search-item" data-id="' + escapeHtml(p.id) + '">' +
+                  '<img src="' + escapeHtml(p.image || "") + '" alt="">' +
+                  '<div>' +
+                    '<div class="tbrn-search-item__name">' + escapeHtml(p.name) + "</div>" +
+                    '<div class="tbrn-search-item__price">' + (p.price != null ? formatTL(p.price) : "") + "</div>" +
+                  "</div>" +
+                "</div>"
+              );
+            }).join("");
+
+            Array.prototype.forEach.call(results.querySelectorAll(".tbrn-search-item"), function (el, idx) {
+              el.addEventListener("click", function () {
+                selectedB = list[idx];
+                document.getElementById("tbrnBSlot").outerHTML = productCardHtml("B", selectedB);
+                results.classList.remove("is-open");
+                results.innerHTML = "";
+                input.value = "";
+                createBtn.disabled = false;
+              });
+            });
+          }
+          results.classList.add("is-open");
+        })
+        .catch(function () {
+          results.innerHTML = '<div class="tbrn-search-empty">Arama sırasında hata oluştu</div>';
+          results.classList.add("is-open");
+        });
+    }, 300);
+
+    input.addEventListener("input", function () { runSearch(input.value.trim()); });
+
+    createBtn.addEventListener("click", function () {
+      if (!selectedB) return;
+      createBtn.disabled = true;
+      createBtn.textContent = "Oluşturuluyor...";
+
+      api("/vote/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_a_id: productA.id, product_b_id: slugFromUrl(selectedB.url) }),
+      })
+        .then(function (vote) {
+          renderShareScreen(overlay, vote.vote_id);
+        })
+        .catch(function (err) {
+          document.getElementById("tbrnCreateMsg").innerHTML =
+            '<div class="tbrn-error">' + escapeHtml(err.message || "Oylama oluşturulamadı.") + "</div>";
+          createBtn.disabled = false;
+          createBtn.textContent = "Oylama Linkini Oluştur";
+        });
+    });
+  }
+
+  function renderShareScreen(overlay, voteId) {
+    var link = location.origin + "/?" + VOTE_PARAM + "=" + voteId;
+    var waText = encodeURIComponent("Hangisini seçerdin? Oy ver: " + link);
+
+    overlay.querySelector(".tbrn-modal").innerHTML =
+      '<div class="tbrn-modal__head">' +
+        '<h3 class="tbrn-modal__title">&nbsp;</h3>' +
+        '<button type="button" class="tbrn-modal__close" id="tbrnClose2">✕</button>' +
+      "</div>" +
+      '<div class="tbrn-share-box">' +
+        '<div style="font-size:32px">🎉</div>' +
+        '<p class="tbrn-share-box__title">Oylama hazır!</p>' +
+        '<p class="tbrn-share-box__desc">Arkadaşlarına gönder ve hangisini daha iyi bulduklarını öğren.</p>' +
+        '<div class="tbrn-share-actions">' +
+          '<a class="tbrn-ask-btn tbrn-ask-btn--wa" href="https://wa.me/?text=' + waText + '" target="_blank" rel="noopener">WhatsApp\'ta Paylaş</a>' +
+          '<button type="button" class="tbrn-ask-btn tbrn-ask-btn--ghost" id="tbrnCopyBtn">Linki Kopyala</button>' +
+        "</div>" +
+      "</div>";
+
+    overlay.querySelector("#tbrnClose2").addEventListener("click", function () {
+      closeOverlay(overlay);
+    });
+
+    overlay.querySelector("#tbrnCopyBtn").addEventListener("click", function (e) {
+      var btn = e.currentTarget;
+      var done = function () {
+        btn.textContent = "Kopyalandı ✓";
+        setTimeout(function () { btn.textContent = "Linki Kopyala"; }, 1800);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(link).then(done).catch(function () { fallbackCopy(link, done); });
+      } else {
+        fallbackCopy(link, done);
+      }
+    });
+  }
+
+  function fallbackCopy(text, done) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); done(); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  // ---------------------------------------------------------------------
+  // 2) OYLAMA EKRANI: ?oy=<vote_id> ile gelen arkadaş tarafı
+  // ---------------------------------------------------------------------
+
+  function initVoteScreenFromUrl() {
+    var params = new URLSearchParams(location.search);
+    var voteId = params.get(VOTE_PARAM);
+
+    if (!voteId || !UUID_RE.test(voteId)) return;
+
+    var overlay = openOverlay('<div class="tbrn-spinner"></div>');
+    loadVoteScreen(overlay, voteId);
+  }
+
+  function loadVoteScreen(overlay, voteId) {
+    var voterToken = getVoterToken();
+
+    api("/vote/" + encodeURIComponent(voteId) + "?voter_token=" + encodeURIComponent(voterToken))
+      .then(function (vote) {
+        renderVoteScreen(overlay, vote);
+      })
+      .catch(function () {
+        overlay.querySelector(".tbrn-modal").innerHTML =
+          '<div class="tbrn-error">Bu oylama bulunamadı ya da kaldırılmış.</div>';
+      });
+  }
+
+  function renderVoteScreen(overlay, vote) {
+    var modal = overlay.querySelector(".tbrn-modal");
+
+    if (vote.voter_choice) {
+      renderResults(modal, vote);
+      return;
+    }
+
+    modal.innerHTML =
+      '<div class="tbrn-modal__head">' +
+        '<h3 class="tbrn-modal__title">Hangisini seçerdin?</h3>' +
+        '<button type="button" class="tbrn-modal__close" id="tbrnVClose">✕</button>' +
+      "</div>" +
+      '<div class="tbrn-vs-row">' +
+        productCardHtml("A", vote.product_a) +
+        productCardHtml("B", vote.product_b) +
+      "</div>" +
+      '<div class="tbrn-vs-row" style="margin-top:-4px">' +
+        '<button type="button" class="tbrn-ask-btn" id="tbrnPickA">A\'yı seç</button>' +
+        '<button type="button" class="tbrn-ask-btn" id="tbrnPickB">B\'yi seç</button>' +
+      "</div>" +
+      '<div id="tbrnVoteMsg"></div>';
+
+    modal.querySelector("#tbrnVClose").addEventListener("click", function () { closeOverlay(overlay); });
+
+    function pick(choice) {
+      modal.querySelector("#tbrnPickA").disabled = true;
+      modal.querySelector("#tbrnPickB").disabled = true;
+
+      api("/vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vote_id: vote.vote_id, choice: choice, voter_token: getVoterToken() }),
+      })
+        .then(function (updated) { renderResults(modal, updated); })
+        .catch(function (err) {
+          modal.querySelector("#tbrnVoteMsg").innerHTML =
+            '<div class="tbrn-error">' + escapeHtml(err.message || "Oy kaydedilemedi.") + "</div>";
+          modal.querySelector("#tbrnPickA").disabled = false;
+          modal.querySelector("#tbrnPickB").disabled = false;
+        });
+    }
+
+    modal.querySelector("#tbrnPickA").addEventListener("click", function () { pick("A"); });
+    modal.querySelector("#tbrnPickB").addEventListener("click", function () { pick("B"); });
+  }
+
+  function renderResults(modal, vote) {
+    var choiceLabel = vote.voter_choice === "A" ? (vote.product_a && vote.product_a.name) : (vote.product_b && vote.product_b.name);
+
+    modal.innerHTML =
+      '<div class="tbrn-modal__head">' +
+        '<h3 class="tbrn-modal__title">Sonuçlar</h3>' +
+        '<button type="button" class="tbrn-modal__close" id="tbrnRClose">✕</button>' +
+      "</div>" +
+      '<div class="tbrn-vs-row">' +
+        productCardHtml("A", vote.product_a) +
+        productCardHtml("B", vote.product_b) +
+      "</div>" +
+      '<div class="tbrn-results">' +
+        '<div class="tbrn-bar"><div class="tbrn-bar__a" style="width:' + vote.percent_a + '%"></div><div class="tbrn-bar__b" style="width:' + vote.percent_b + '%"></div></div>' +
+        '<p>A — %' + vote.percent_a + " &nbsp;·&nbsp; B — %" + vote.percent_b + "</p>" +
+        (choiceLabel ? '<p class="tbrn-results__you">Senin seçimin: ' + escapeHtml(choiceLabel) + "</p>" : "") +
+        '<p class="tbrn-results__count">Şimdiye kadar ' + vote.total_votes + " kişi oy verdi.</p>" +
+      "</div>";
+
+    modal.querySelector("#tbrnRClose").addEventListener("click", function () {
+      closeOverlay(modal.closest(".tbrn-overlay"));
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Başlat
+  // ---------------------------------------------------------------------
+
+  function boot() {
+    try { initAskFriendsCard(); } catch (e) {}
+    try { initVoteScreenFromUrl(); } catch (e) {}
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
+})();
+</script>

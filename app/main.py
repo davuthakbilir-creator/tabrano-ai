@@ -1,9 +1,11 @@
+from uuid import UUID
+
 from fastapi import FastAPI, HTTPException, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from app.services.ai_service import ask_ai
-from app.services.product_service import get_products
+from app.services.product_service import get_products, find_products
 from app.services.vision_service import (
     analyze_room,
     ALLOWED_CONTENT_TYPES,
@@ -13,6 +15,11 @@ from app.services.render_service import render_product_in_room
 from app.services.nano_render_service import (
     generate_room_render,
     generate_ai_design,
+)
+from app.services.vote_service import (
+    create_vote_session,
+    submit_vote,
+    get_vote_state,
 )
 
 
@@ -41,6 +48,23 @@ class ChatRequest(BaseModel):
     history: list = Field(
         default_factory=list
     )
+
+
+
+
+class VoteCreateRequest(BaseModel):
+
+    product_a_id: str
+    product_b_id: str
+
+
+
+
+class VoteSubmitRequest(BaseModel):
+
+    vote_id: UUID
+    choice: str
+    voter_token: str
 
 
 
@@ -91,6 +115,49 @@ def chat(request: ChatRequest):
 def products():
 
     return get_products()
+
+
+
+
+@app.get("/products/search")
+def products_search(q: str, limit: int = 20):
+
+    try:
+
+        q = (q or "").strip()
+
+        if len(q) < 2:
+            return []
+
+        results = find_products(q)
+
+        light = [
+            {
+                "id": r["id"],
+                "name": r["name"],
+                "price": r["price"],
+                "url": r["url"],
+                "image": r["image"],
+            }
+            for r in results[:limit]
+        ]
+
+        return light
+
+
+
+    except Exception as e:
+
+        print(
+            "PRODUCT SEARCH HATASI:",
+            repr(e)
+        )
+
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 
 
@@ -302,6 +369,132 @@ async def render_ai_design_endpoint(
 
         print(
             "RENDER AI DESIGN HATASI:",
+            repr(e)
+        )
+
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+
+
+
+@app.post("/vote/create")
+def vote_create(request: VoteCreateRequest):
+
+    try:
+
+        result = create_vote_session(
+            product_a_id=request.product_a_id,
+            product_b_id=request.product_b_id
+        )
+
+        return result
+
+
+
+    except ValueError as e:
+
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+
+
+
+    except Exception as e:
+
+        print(
+            "VOTE CREATE HATASI:",
+            repr(e)
+        )
+
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+
+
+
+@app.post("/vote")
+def vote_submit(request: VoteSubmitRequest):
+
+    try:
+
+        result = submit_vote(
+            vote_id=request.vote_id,
+            choice=request.choice,
+            voter_token=request.voter_token
+        )
+
+        return result
+
+
+
+    except ValueError as e:
+
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+
+
+    except LookupError as e:
+
+        raise HTTPException(
+            status_code=404,
+            detail=str(e)
+        )
+
+
+
+    except Exception as e:
+
+        print(
+            "VOTE SUBMIT HATASI:",
+            repr(e)
+        )
+
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+
+
+
+@app.get("/vote/{vote_id}")
+def vote_get(vote_id: UUID, voter_token: str | None = None):
+
+    try:
+
+        result = get_vote_state(
+            vote_id=vote_id,
+            voter_token=voter_token
+        )
+
+        return result
+
+
+
+    except LookupError as e:
+
+        raise HTTPException(
+            status_code=404,
+            detail=str(e)
+        )
+
+
+
+    except Exception as e:
+
+        print(
+            "VOTE GET HATASI:",
             repr(e)
         )
 

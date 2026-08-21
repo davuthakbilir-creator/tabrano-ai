@@ -349,6 +349,39 @@ def get_products_by_ids(ids):
 
     return rows
 
+
+def get_products_by_slugs(slugs):
+    """`slugs` sondaki path parçasıdır (ör. 'rex-orta-sehpa'), tam URL değil.
+    Ticimax'ın ürün kartı ID'si tabrano-ai'daki product_card_id ile birebir
+    eşleşmediği için (product_card_id yalnızca bu DB'nin kendi sıra numarasıdır),
+    ürünler arası eşleştirme URL slug'ı üzerinden yapılır."""
+
+    if not slugs:
+        return []
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        r"""
+        SELECT
+            product_card_id, stock_code, name, category, description,
+            width, depth, height, price, url, image,
+            color, material, style, category_name, category_url,
+            variants, style_profile
+        FROM products
+        WHERE regexp_replace(url, '^https?://(www\.)?[^/]+/?', '') = ANY(%s)
+        """,
+        (slugs,)
+    )
+
+    rows = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return rows
+
 def get_distinct_categories():
 
     conn = get_connection()
