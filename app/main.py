@@ -1,3 +1,4 @@
+import re
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, File, UploadFile, Form
@@ -21,6 +22,7 @@ from app.services.vote_service import (
     submit_vote,
     get_vote_state,
 )
+from app.database.lead_repository import ensure_leads_table, create_lead
 
 
 
@@ -69,6 +71,27 @@ class VoteSubmitRequest(BaseModel):
     vote_id: UUID
     choice: str
     voter_token: str
+
+
+
+
+class LeadCreateRequest(BaseModel):
+
+    full_name: str
+    phone: str
+
+
+
+
+PHONE_PATTERN = re.compile(r"^0?5\d{9}$")
+
+
+
+
+@app.on_event("startup")
+def on_startup():
+
+    ensure_leads_table()
 
 
 
@@ -499,6 +522,65 @@ def vote_get(vote_id: UUID, voter_token: str | None = None):
 
         print(
             "VOTE GET HATASI:",
+            repr(e)
+        )
+
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+
+
+
+@app.post("/lead")
+def lead_create(request: LeadCreateRequest):
+
+    full_name = request.full_name.strip()
+    phone = re.sub(r"\D", "", request.phone)
+
+    if phone.startswith("90") and len(phone) == 12:
+        phone = phone[2:]
+
+    if len(full_name) < 2:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Ad soyad geçersiz."
+        )
+
+
+    if not PHONE_PATTERN.match(phone):
+
+        raise HTTPException(
+            status_code=400,
+            detail="Telefon numarası geçersiz."
+        )
+
+
+    normalized_phone = "0" + phone if not phone.startswith("0") else phone
+
+
+    try:
+
+        lead_id, created_at = create_lead(
+            full_name=full_name,
+            phone=normalized_phone
+        )
+
+        return {
+            "status": "ok",
+            "id": lead_id,
+            "created_at": created_at
+        }
+
+
+
+    except Exception as e:
+
+        print(
+            "LEAD KAYIT HATASI:",
             repr(e)
         )
 
