@@ -79,11 +79,16 @@ class LeadCreateRequest(BaseModel):
 
     full_name: str
     phone: str
+    consent_kvkk: bool = False
+    consent_marketing: bool = False
 
 
 
 
 PHONE_PATTERN = re.compile(r"^0?5\d{9}$")
+
+
+CONSENT_TEXT_VERSION = "2026-09-02"
 
 
 
@@ -559,6 +564,14 @@ def lead_create(request: LeadCreateRequest):
         )
 
 
+    if not request.consent_kvkk:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Devam edebilmek için Tabrano AI Aydınlatma ve Açık Rıza Metni'ni onaylamanız gerekir."
+        )
+
+
     normalized_phone = "0" + phone if not phone.startswith("0") else phone
 
 
@@ -566,7 +579,10 @@ def lead_create(request: LeadCreateRequest):
 
         lead_id, created_at = create_lead(
             full_name=full_name,
-            phone=normalized_phone
+            phone=normalized_phone,
+            consent_kvkk=True,
+            consent_marketing=bool(request.consent_marketing),
+            consent_version=CONSENT_TEXT_VERSION
         )
 
         return {
