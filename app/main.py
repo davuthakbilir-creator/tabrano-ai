@@ -1,7 +1,9 @@
+import os
 import re
+import secrets
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException, File, UploadFile, Form
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form, Header, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -23,6 +25,7 @@ from app.services.vote_service import (
     get_vote_state,
 )
 from app.database.lead_repository import ensure_leads_table, create_lead
+from app.services.product_sync_service import sync_new_products, start_auto_sync
 
 
 
@@ -97,6 +100,8 @@ CONSENT_TEXT_VERSION = "2026-09-02"
 def on_startup():
 
     ensure_leads_table()
+
+    start_auto_sync()
 
 
 
@@ -605,3 +610,20 @@ def lead_create(request: LeadCreateRequest):
             status_code=500,
             detail=str(e)
         )
+
+
+@app.post("/admin/sync-products")
+def admin_sync_products(
+    background_tasks: BackgroundTasks,
+    x_sync_token: str = Header(default=""),
+):
+    """Sitemap'e yeni eklenen ürünleri veritabanına alır (arka planda)."""
+
+    expected = os.getenv("SYNC_TOKEN", "")
+
+    if not expected or not secrets.compare_digest(x_sync_token, expected):
+        raise HTTPException(status_code=403, detail="Yetkisiz.")
+
+    background_tasks.add_task(sync_new_products)
+
+    return {"status": "started"}
