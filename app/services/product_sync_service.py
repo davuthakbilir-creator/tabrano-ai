@@ -102,6 +102,54 @@ def sync_new_products():
         _sync_lock.release()
 
 
+def list_product_urls():
+    urls, _ = _get_existing_state()
+    return sorted(urls)
+
+
+def import_products(products):
+    """Dışarıda (ör. yerel makinede) çekilmiş ürünleri, URL'i yoksa ekler."""
+    existing_urls, max_id = _get_existing_state()
+
+    added = 0
+    skipped = 0
+
+    for product in products:
+        url = _normalize(product.get("url"))
+
+        if not url or url in existing_urls or not product.get("name"):
+            skipped += 1
+            continue
+
+        max_id += 1
+
+        insert_product({
+            "product_card_id": max_id,
+            "stock_code": "",
+            "name": product["name"],
+            "category": "",
+            "description": product.get("description", ""),
+            "width": product.get("width"),
+            "depth": product.get("depth"),
+            "height": product.get("height"),
+            "price": product.get("price"),
+            "url": product["url"],
+            "image": product.get("image", ""),
+            "color": product.get("color", ""),
+            "material": product.get("material", ""),
+            "style": product.get("product_type", ""),
+            "is_active": True,
+            "variants": json.dumps(
+                product.get("variants", []),
+                ensure_ascii=False
+            ),
+        })
+        existing_urls.add(url)
+        added += 1
+
+    return {"added": added, "skipped": skipped}
+
+
 def start_auto_sync():
     """Sunucu açıldıktan sonra periyodik olarak yeni ürünleri içeri alır."""
 

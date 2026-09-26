@@ -25,7 +25,12 @@ from app.services.vote_service import (
     get_vote_state,
 )
 from app.database.lead_repository import ensure_leads_table, create_lead
-from app.services.product_sync_service import sync_new_products, start_auto_sync
+from app.services.product_sync_service import (
+    sync_new_products,
+    start_auto_sync,
+    list_product_urls,
+    import_products,
+)
 
 
 
@@ -627,3 +632,25 @@ def admin_sync_products(
     background_tasks.add_task(sync_new_products)
 
     return {"status": "started"}
+
+
+def _check_sync_token(x_sync_token):
+    expected = os.getenv("SYNC_TOKEN", "")
+
+    if not expected or not secrets.compare_digest(x_sync_token, expected):
+        raise HTTPException(status_code=403, detail="Yetkisiz.")
+
+
+@app.get("/admin/product-urls")
+def admin_product_urls(x_sync_token: str = Header(default="")):
+    _check_sync_token(x_sync_token)
+    return {"urls": list_product_urls()}
+
+
+@app.post("/admin/import-products")
+def admin_import_products(
+    products: list[dict],
+    x_sync_token: str = Header(default=""),
+):
+    _check_sync_token(x_sync_token)
+    return import_products(products)
