@@ -253,10 +253,14 @@ def search_products(
 
 
 
+    # İsminde geçen ürünler önce gelsin; yoksa açıklamasında "konsol" geçen
+    # alfabetik ilk 20 ürün, adı "Konsol" olan yeni ürünleri dışarıda bırakıyor.
     query += """
-        ORDER BY name
+        ORDER BY (LOWER(name) LIKE LOWER(%s)) DESC, name
         LIMIT 20
     """
+
+    params.append(f"%{keyword}%")
 
 
 
